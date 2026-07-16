@@ -37,7 +37,10 @@ export default function AdminDashboard() {
     }
   }
 
-  async function handleAction(userId: number, action: string) {
+ async function handleLogout() {
+    await fetch('/api/admin/logout', { method: 'POST' });
+    router.push('/admin/login');
+ } async function handleAction(userId: number, action: string) {
     try {
       const res = await fetch(`/api/admin/users/${userId}`, {
         method: 'PUT',
@@ -75,12 +78,20 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-botverse-black text-white px-4 py-6">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">
-          <span className="text-botverse-green">Bot</span>
-          <span className="text-botverse-pink">Verse</span>
-          <span className="text-gray-500 text-base ml-2">Admin Panel</span>
-        </h1>
-
+        
+div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">
+            <span className="text-botverse-green">Bot</span>
+            <span className="text-botverse-pink">Verse</span>
+            <span className="text-gray-500 text-base ml-2">Admin Panel</span>
+          </h1>
+          <button
+            onClick={handleLogout}
+            className="text-sm text-gray-400 border border-gray-700 px-3 py-1 rounded"
+          >
+            Logout
+          </button>
+        </div>
         {error && <p className="text-botverse-pink mb-4">{error}</p>}
 
         <h2 className="text-lg font-semibold mb-3">Registered Users ({users.length})</h2>
