@@ -11,17 +11,39 @@ interface User {
   business_description: string | null;
 }
 
+interface Platform {
+  platform: string;
+  phone_number_id: string | null;
+  page_id: string | null;
+  is_connected: boolean;
+  is_enabled: boolean;
+}
+
+const PLATFORM_LABELS: Record<string, string> = {
+  whatsapp: 'WhatsApp',
+  facebook: 'Facebook',
+  instagram: 'Instagram',
+};
+
 export default function Dashboard() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [description, setDescription] = useState('');
   const [savingDesc, setSavingDesc] = useState(false);
   const [descSaved, setDescSaved] = useState(false);
 
+  const [formPlatform, setFormPlatform] = useState<string | null>(null);
+  const [formPhoneId, setFormPhoneId] = useState('');
+  const [formPageId, setFormPageId] = useState('');
+  const [formToken, setFormToken] = useState('');
+  const [savingPlatform, setSavingPlatform] = useState(false);
+
   useEffect(() => {
     fetchUser();
+    fetchPlatforms();
   }, []);
 
   async function fetchUser() {
@@ -38,6 +60,18 @@ export default function Dashboard() {
       setError('Failed to load your dashboard');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchPlatforms() {
+    try {
+      const res = await fetch('/api/user/platforms');
+      if (res.ok) {
+        const data = await res.json();
+        setPlatforms(data.platforms);
+      }
+    } catch {
+      // silent fail, non-critical
     }
   }
 
@@ -82,6 +116,59 @@ export default function Dashboard() {
     }
   }
 
+  function getPlatform(name: string): Platform | undefined {
+    return platforms.find((p) => p.platform === name);
+  }
+
+  function openForm(name: string) {
+    const existing = getPlatform(name);
+    setFormPlatform(name);
+    setFormPhoneId(existing?.phone_number_id || '');
+    setFormPageId(existing?.page_id || '');
+    setFormToken('');
+  }
+
+  async function savePlatform() {
+    if (!formPlatform) return;
+    setSavingPlatform(true);
+    try {
+      const res = await fetch('/api/user/platforms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: formPlatform,
+          phone_number_id: formPhoneId,
+          page_id: formPageId,
+          access_token: formToken,
+        }),
+      });
+      if (res.ok) {
+        setFormPlatform(null);
+        fetchPlatforms();
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to connect');
+      }
+    } catch {
+      setError('Failed to connect');
+    } finally {
+      setSavingPlatform(false);
+    }
+  }
+
+  async function togglePlatform(name: string) {
+    try {
+      const res = await fetch('/api/user/platforms-toggle', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform: name }),
+      });
+      if (res.ok) fetchPlatforms();
+    } catch {
+      setError('Failed to toggle platform');
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-botverse-black text-white flex items-center justify-center">
@@ -90,13 +177,15 @@ export default function Dashboard() {
     );
   }
 
-  if (error || !user) {
+  if (error && !user) {
     return (
       <div className="min-h-screen bg-botverse-black text-white flex items-center justify-center">
-        <p className="text-botverse-pink">{error || 'Something went wrong'}</p>
+        <p className="text-botverse-pink">{error}</p>
       </div>
     );
   }
+
+  if (!user) return null;
 
   const isApproved = user.status === 'approved';
 
@@ -112,6 +201,8 @@ export default function Dashboard() {
             Logout
           </button>
         </div>
+
+        {error && <p className="text-botverse-pink text-sm mb-4">{error}</p>}
 
         <div className="bg-gray-900 rounded-lg p-4 mb-4">
           <p className="text-gray-400 text-sm">Welcome back,</p>
@@ -186,6 +277,85 @@ export default function Dashboard() {
               >
                 {savingDesc ? 'Saving...' : descSaved ? 'Saved ✓' : 'Save'}
               </button>
+            </div>
+
+            <div className="bg-gray-900 rounded-lg p-4 mb-4">
+              <p className="font-semibold mb-3">Platform Connections</p>
+
+              {['whatsapp', 'facebook', 'instagram'].map((name) => {
+                const conn = getPlatform(name);
+                return (
+                  <div key={name} className="border-t border-gray-800 py-3 first:border-t-0 first:pt-0">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium">{PLATFORM_LABELS[name]}</span>
+                      <div className="flex gap-2 items-center">
+                        {conn?.is_connected && (
+                          <button
+                            onClick={() => togglePlatform(name)}
+                            className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                              conn.is_enabled ? 'bg-botverse-green text-black' : 'bg-gray-700 text-gray-300'
+                            }`}
+                          >
+                            {conn.is_enabled ? 'ON' : 'OFF'}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => openForm(name)}
+                          className="text-xs border border-botverse-blue text-botverse-blue px-3 py-1 rounded-full"
+                        >
+                          {conn?.is_connected ? 'Edit' : 'Connect'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {conn?.is_connected && (
+                      <p className="text-xs text-gray-500">✓ Connected</p>
+                    )}
+
+                    {formPlatform === name && (
+                      <div className="mt-2 space-y-2 bg-gray-800 p-3 rounded">
+                        {name === 'whatsapp' && (
+                          <input
+                            placeholder="Phone Number ID"
+                            value={formPhoneId}
+                            onChange={(e) => setFormPhoneId(e.target.value)}
+                            className="w-full p-2 rounded bg-gray-900 border border-gray-700 text-sm outline-none"
+                          />
+                        )}
+                        {(name === 'facebook' || name === 'instagram') && (
+                          <input
+                            placeholder="Page ID"
+                            value={formPageId}
+                            onChange={(e) => setFormPageId(e.target.value)}
+                            className="w-full p-2 rounded bg-gray-900 border border-gray-700 text-sm outline-none"
+                          />
+                        )}
+                        <input
+                          placeholder="Access Token"
+                          value={formToken}
+                          onChange={(e) => setFormToken(e.target.value)}
+                          className="w-full p-2 rounded bg-gray-900 border border-gray-700 text-sm outline-none"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={savePlatform}
+                            disabled={savingPlatform}
+                            className="bg-botverse-green text-black text-xs font-semibold px-3 py-1.5 rounded disabled:opacity-50"
+                          >
+                            {savingPlatform ? 'Saving...' : 'Save'}
+                          </button>
+                          <button
+                            onClick={() => setFormPlatform(null)}
+                            className="text-xs text-gray-400 px-3 py-1.5"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </>
         )}
