@@ -35,6 +35,10 @@ export default function Dashboard() {
   const [savingDesc, setSavingDesc] = useState(false);
   const [descSaved, setDescSaved] = useState(false);
 
+  const [welcomeMsg, setWelcomeMsg] = useState('');
+  const [savingWelcome, setSavingWelcome] = useState(false);
+  const [welcomeSaved, setWelcomeSaved] = useState(false);
+
   const [formPlatform, setFormPlatform] = useState<string | null>(null);
   const [formPhoneId, setFormPhoneId] = useState('');
   const [formPageId, setFormPageId] = useState('');
@@ -44,6 +48,7 @@ export default function Dashboard() {
   useEffect(() => {
     fetchUser();
     fetchPlatforms();
+    fetchWelcomeMessage();
   }, []);
 
   async function fetchUser() {
@@ -69,6 +74,18 @@ export default function Dashboard() {
       if (res.ok) {
         const data = await res.json();
         setPlatforms(data.platforms);
+      }
+    } catch {
+      // silent fail, non-critical
+    }
+  }
+
+  async function fetchWelcomeMessage() {
+    try {
+      const res = await fetch('/api/user/welcome-message');
+      if (res.ok) {
+        const data = await res.json();
+        setWelcomeMsg(data.message);
       }
     } catch {
       // silent fail, non-critical
@@ -113,6 +130,26 @@ export default function Dashboard() {
       setError('Failed to save description');
     } finally {
       setSavingDesc(false);
+    }
+  }
+
+  async function saveWelcomeMessage() {
+    setSavingWelcome(true);
+    setWelcomeSaved(false);
+    try {
+      const res = await fetch('/api/user/welcome-message', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: welcomeMsg }),
+      });
+      if (res.ok) {
+        setWelcomeSaved(true);
+        setTimeout(() => setWelcomeSaved(false), 2000);
+      }
+    } catch {
+      setError('Failed to save welcome message');
+    } finally {
+      setSavingWelcome(false);
     }
   }
 
@@ -276,6 +313,27 @@ export default function Dashboard() {
                 className="mt-2 bg-botverse-blue text-black text-sm font-semibold px-4 py-2 rounded disabled:opacity-50"
               >
                 {savingDesc ? 'Saving...' : descSaved ? 'Saved ✓' : 'Save'}
+              </button>
+            </div>
+
+            <div className="bg-gray-900 rounded-lg p-4 mb-4">
+              <p className="font-semibold mb-2">Welcome Message</p>
+              <p className="text-xs text-gray-500 mb-2">
+                This message is sent once, automatically, the first time a customer messages you.
+              </p>
+              <textarea
+                value={welcomeMsg}
+                onChange={(e) => setWelcomeMsg(e.target.value)}
+                rows={3}
+                className="w-full p-3 rounded bg-gray-800 border border-gray-700 focus:border-botverse-blue outline-none text-sm"
+                placeholder="e.g. Hi! Thanks for reaching out to us. How can we help you today?"
+              />
+              <button
+                onClick={saveWelcomeMessage}
+                disabled={savingWelcome}
+                className="mt-2 bg-botverse-blue text-black text-sm font-semibold px-4 py-2 rounded disabled:opacity-50"
+              >
+                {savingWelcome ? 'Saving...' : welcomeSaved ? 'Saved ✓' : 'Save'}
               </button>
             </div>
 
